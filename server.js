@@ -3,8 +3,6 @@ const https = require("https");
 const config = require("./config.json");
 
 const apiKeys = config.apiKeys;
-const validApiKey = "j176p6rf1qyy7vc7wxp7j4cw"
-// const validApiKey = config.validApiKey;
 
 let currentApiKeyIndex = 0;
 
@@ -42,23 +40,54 @@ function forwardToOpenAI(apiUrl, url, data, apiKey, res, models) {
     console.error("Error sending request to OpenAI:", error);
     res.statusCode = 500;
     res.end();
+
+    // Handle the error by changing the API key and retrying
+    handleReverseProxyError(apiUrl, url, data, models, res);
   });
 
   req.write(data);
   req.end();
 }
 
+
 function checkModel(apiKey, apiUrl, models, model, url, data, res) {
+  const apiKeyInfo = config.apiKeys.find(info => info.key === apiKey);
+
+  if (!apiKeyInfo) {
+    res.statusCode = 500;
+    res.end(JSON.stringify({ error: "Invalid API key" }));
+    return;
+  }
+
   if (models.includes(model)) {
     console.log(`Forwarding to ${apiUrl} with API key: ${apiKey}`);
     forwardToOpenAI(apiUrl, url, data, apiKey, res, models);
-    getNextApiKey();
   } else {
-    getNextApiKey();
     console.log("Model not supported by this API key");
     res.statusCode = 400;
     res.end(JSON.stringify({ error: "Model not supported by this API key" }));
   }
+
+  // Aggiorna l'indice della chiave API in base all'API utilizzata
+  const newApiKeyInfo = getNextApiKey();
+  currentApiKeyIndex = config.apiKeys.findIndex(info => info.key === newApiKeyInfo.apiKey);
+}
+
+function handleApiKeyRotationAndRetry(apiUrl, url, data, apiKey, res, models) {
+  forwardToOpenAI(apiUrl, url, data, apiKey, res, models);
+}
+
+function handleReverseProxyError(apiUrl, url, data, models, res) {
+  console.log("Error from reverse proxy. Changing API key and retrying.");
+  const newApiKeyInfo = getNextApiKey();
+  handleApiKeyRotationAndRetry(
+    newApiKeyInfo.apiUrl,
+    url,
+    data,
+    newApiKeyInfo.apiKey,
+    res,
+    models
+  );
 }
 
 http.createServer((req, res) => {
@@ -82,39 +111,16 @@ http.createServer((req, res) => {
     const url = req.url.split("?")[0];
 
     try {
-      const authorizationHeader = req.headers["authorization"];
-      const providedApiKey = authorizationHeader
-      ? authorizationHeader.split(" ")[1].trim()
-      : null;  
       const payload = JSON.parse(data);
       const model = payload.model;
 
-      console.log("Received API key:", providedApiKey);
-      console.log("Received model:", model);
-      console.log("validApiKey:", validApiKey);
+      const apiKeyInfo = config.apiKeys[currentApiKeyIndex];
+      const apiKey = apiKeyInfo.key;
+      const apiUrl = apiKeyInfo.url;
+      const models = apiKeyInfo.models;
+      console.log(url, apiUrl);
 
-      if (!providedApiKey || providedApiKey.trim() !== validApiKey.trim()) {
-        console.log('Invalid API key');
-        res.statusCode = 401;
-        res.end(JSON.stringify({ error: 'Invalid API key' }));
-        return;
-      } else {
-        const apiKeyInfo = config.apiKeys.find(
-          (apiKeyInfo) => apiKeyInfo.key === providedApiKey
-        );
-
-        if (apiKeyInfo) {
-          const apiKey = apiKeyInfo.key;
-          const apiUrl = apiKeyInfo.url;
-          const models = apiKeyInfo.models;
-
-          checkModel(apiKey, apiUrl, models, model, url, data, res);
-        } else {
-          console.log("Invalid API key");
-          res.statusCode = 401;
-          res.end(JSON.stringify({ error: "Invalid API key" }));
-        }
-      }
+      forwardToOpenAI(apiUrl, url, data, apiKey, res, models);
     } catch (error) {
       console.error("Error processing request:", error);
       res.statusCode = 400; // Bad Request
