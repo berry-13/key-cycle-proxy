@@ -28,7 +28,7 @@ Before you begin, ensure you have met the following requirements:
       {
         "key": "api-key-1",
         "url": "api-base-url-",
-        "models": [model-that-this-api key-use]
+        "models": ["model"]
       }
     ]
   }
