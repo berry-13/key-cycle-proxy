@@ -1,132 +1,121 @@
-const http = require("http");
-const https = require("https");
-const config = require("./config.json");
+const http = require('http');
+const https = require('https');
+const config = require('./config.json');
 
 const apiKeys = config.apiKeys;
 
 let currentApiKeyIndex = 0;
+let attemptCount = 0;
 
 function getNextApiKey() {
   const numKeys = apiKeys.length;
   currentApiKeyIndex = (currentApiKeyIndex + 1) % numKeys;
-  const apiKeyInfo = apiKeys[currentApiKeyIndex];
-  return {
-    apiKey: apiKeyInfo.key,
-    apiUrl: apiKeyInfo.url,
-    models: apiKeyInfo.models,
-  };
+  return apiKeys[currentApiKeyIndex];
 }
 
-function forwardToOpenAI(apiUrl, url, data, apiKey, res, models) {
+function forwardToOpenAI(apiKeyInfo, url, data, res) {
+  const { key, url: apiUrl } = apiKeyInfo;
   const openaiUrl = apiUrl + url;
   const options = {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + encodeURIComponent(apiKey),
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${encodeURIComponent(key)}`,
     },
   };
+
   const req = https.request(openaiUrl, options, (proxyRes) => {
-    console.log(
-      "Received response from the reverse proxy. Status:",
-      proxyRes.statusCode
-    );
+    console.log('Received response from the reverse proxy. Status:', proxyRes.statusCode);
 
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res);
+    if (proxyRes.statusCode === 429 || proxyRes.statusCode === 418 || proxyRes.statusCode === 502) {
+      handleReverseProxyError(res, url, data);
+    } else {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    }
   });
 
-  req.on("error", (error) => {
-    console.error("Error sending request to OpenAI:", error);
-    res.statusCode = 500;
-    res.end();
-
-    // Handle the error by changing the API key and retrying
-    handleReverseProxyError(apiUrl, url, data, models, res);
+  req.on('error', (error) => {
+    console.error('Error sending request to OpenAI:', error);
+    handleReverseProxyError(res, url, data);
   });
-
+  getNextApiKey();
   req.write(data);
   req.end();
 }
 
-
-function checkModel(apiKey, apiUrl, models, model, url, data, res) {
-  const apiKeyInfo = config.apiKeys.find(info => info.key === apiKey);
-
-  if (!apiKeyInfo) {
+function checkModel(apiKey, model, url, data, res) {
+  if (apiKey === undefined) {
     res.statusCode = 500;
-    res.end(JSON.stringify({ error: "Invalid API key" }));
+    res.end(JSON.stringify({ error: 'No API key found' }));
     return;
   }
 
-  if (models.includes(model)) {
-    console.log(`Forwarding to ${apiUrl} with API key: ${apiKey}`);
-    forwardToOpenAI(apiUrl, url, data, apiKey, res, models);
+  const apiKeyInfo = apiKeys.find((info) => info.key === apiKey);
+
+  if (!apiKeyInfo) {
+    res.statusCode = 500;
+    res.end(JSON.stringify({ error: 'Invalid API key' }));
+  } else if (apiKeyInfo.models.includes(model)) {
+    attemptCount = 0;
+    console.log(`Forwarding to ${apiKeyInfo.url} with API key: ${apiKey}`);
+    forwardToOpenAI(apiKeyInfo, url, data, res);
   } else {
-    console.log("Model not supported by this API key");
-    res.statusCode = 400;
-    res.end(JSON.stringify({ error: "Model not supported by this API key" }));
+    console.log('Model not supported by this API key');
+    modelNotSupported(apiKey, model, url, data, res);
+  }
+}
+
+function handleReverseProxyError(res, url, data) {
+  console.log('Error from the reverse proxy. Changing API key and retrying.');
+  const newApiKeyInfo = getNextApiKey();
+  forwardToOpenAI(newApiKeyInfo, url, data, res);
+  console.log('Forwarding to', newApiKeyInfo.url, 'with API key:', newApiKeyInfo.key);
+}
+
+async function modelNotSupported(apiKey, model, url, data, res) {
+  if (attemptCount >= apiKeys.length) {
+    // All API keys have been tried and none support the model
+    res.statusCode = 500;
+    res.end(JSON.stringify({ error: 'No API key available for this model' }));
+    return;
   }
 
-  // Aggiorna l'indice della chiave API in base all'API utilizzata
+  attemptCount++; // Increment the count of attempts
   const newApiKeyInfo = getNextApiKey();
-  currentApiKeyIndex = config.apiKeys.findIndex(info => info.key === newApiKeyInfo.apiKey);
-}
-
-function handleApiKeyRotationAndRetry(apiUrl, url, data, apiKey, res, models) {
-  forwardToOpenAI(apiUrl, url, data, apiKey, res, models);
-}
-
-function handleReverseProxyError(apiUrl, url, data, models, res) {
-  console.log("Error from reverse proxy. Changing API key and retrying.");
-  const newApiKeyInfo = getNextApiKey();
-  handleApiKeyRotationAndRetry(
-    newApiKeyInfo.apiUrl,
-    url,
-    data,
-    newApiKeyInfo.apiKey,
-    res,
-    models
-  );
+  checkModel(newApiKeyInfo.key, model, url, data, res);
 }
 
 http.createServer((req, res) => {
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  console.log("Received POST request:", req.url);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  console.log('Received POST request:', req.url);
 
-  if (req.method !== "POST") {
+  if (req.method !== 'POST') {
     res.statusCode = 405; // Method Not Allowed
     res.end();
     return;
   }
 
-  const chunks = [];
-  req.on("data", (chunk) => {
-    chunks.push(chunk);
+  let data = '';
+  req.on('data', (chunk) => {
+    data += chunk;
   });
 
-  req.on("end", () => {
-    const data = Buffer.concat(chunks).toString();
-    const url = req.url.split("?")[0];
-
+  req.on('end', () => {
     try {
       const payload = JSON.parse(data);
       const model = payload.model;
 
-      const apiKeyInfo = config.apiKeys[currentApiKeyIndex];
+      const apiKeyInfo = apiKeys[currentApiKeyIndex];
       const apiKey = apiKeyInfo.key;
-      const apiUrl = apiKeyInfo.url;
-      const models = apiKeyInfo.models;
-      console.log(url, apiUrl);
-
-      forwardToOpenAI(apiUrl, url, data, apiKey, res, models);
+      checkModel(apiKey, model, req.url, data, res);
     } catch (error) {
-      console.error("Error processing request:", error);
+      console.error('Error processing request:', error);
       res.statusCode = 400; // Bad Request
-      res.end(JSON.stringify({ error: "Invalid JSON payload" }));
+      res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
     }
   });
-}).listen(3456, "localhost", () => {
-  console.log("Server running at http://localhost:3456/");
+}).listen(3456, '192.168.1.34', () => {
+  console.log('Server running at http://192.168.1.34:3456/');
 });
