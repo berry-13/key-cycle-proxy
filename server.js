@@ -116,6 +116,6 @@ http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
     }
   });
-}).listen(3456, '192.168.1.34', () => {
-  console.log('Server running at http://192.168.1.34:3456/');
+}).listen(3456, 'localhost', () => {
+  console.log('Server running at http://localhost:3456/');
 });
