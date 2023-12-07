@@ -27,7 +27,7 @@ function forwardToOpenAI(apiKeyInfo, url, data, res) {
   const req = https.request(openaiUrl, options, (proxyRes) => {
     console.log('Received response from the reverse proxy. Status:', proxyRes.statusCode);
 
-    if (proxyRes.statusCode === 429 || proxyRes.statusCode === 418 || proxyRes.statusCode === 502) {
+    if (proxyRes.statusCode === 429 || proxyRes.statusCode === 418 || proxyRes.statusCode === 502 || proxyRes.statusCode === 400) {
       handleReverseProxyError(res, url, data);
     } else {
       res.writeHead(proxyRes.statusCode, proxyRes.headers);
@@ -117,5 +117,5 @@ http.createServer((req, res) => {
     }
   });
 }).listen(3456, 'localhost', () => {
-  console.log('Server running at http://localhost:3456/');
+  console.log('Server running at http://localhost:3000/');
 });
