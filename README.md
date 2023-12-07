@@ -1,6 +1,9 @@
-# Reverse Proxy Server
+<p align="center">
+    <img src="https://github.com/Berry-13/API-Key-Rotator/assets/81851188/3a17e214-ff55-418d-bdac-524a1c553503" height="256">
+    <h1 align="center">KeyCycleProxy</h1>
+</p>
 
-The API-Key-Rotator is a Node.js-based server that serves as a reverse proxy for reverse proxies and OpenAI. This server allows you to efficiently route requests to reverse proxies or OpenAI while automatically rotating between multiple API keys to ensure uninterrupted service
+The KeyCycleProxy is a Node.js-based server that serves as a reverse proxy for reverse proxies and OpenAI. This server allows you to efficiently route requests to reverse proxies or OpenAI while automatically rotating between multiple API keys to ensure uninterrupted service
 
 ## Features
 
