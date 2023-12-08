@@ -76,6 +76,6 @@ Here's an example of how it could be configured:
 
 
 ## Usage
-Start the server by running the command `npm start`
+Start the server by running the command `node server.js`
 
 The server will automatically handle the routing and key rotation for you
