@@ -16,6 +16,11 @@ function getNextApiKey() {
 function forwardToOpenAI(apiKeyInfo, url, data, res) {
   const { key, url: apiUrl } = apiKeyInfo;
   const openaiUrl = apiUrl + url;
+  
+  const parsedUrl = new URL(openaiUrl);
+
+  const transport = parsedUrl.protocol === 'https:' ? https : http;
+
   const options = {
     method: 'POST',
     headers: {
@@ -24,7 +29,7 @@ function forwardToOpenAI(apiKeyInfo, url, data, res) {
     },
   };
 
-  const req = https.request(openaiUrl, options, (proxyRes) => {
+  const req = transport.request(parsedUrl, options, (proxyRes) => {
     console.log('Received response from the reverse proxy. Status:', proxyRes.statusCode);
 
     if (proxyRes.statusCode === 429 || proxyRes.statusCode === 418 || proxyRes.statusCode === 502 || proxyRes.statusCode === 400) {
@@ -39,10 +44,12 @@ function forwardToOpenAI(apiKeyInfo, url, data, res) {
     console.error('Error sending request to OpenAI:', error);
     handleReverseProxyError(res, url, data);
   });
+
   getNextApiKey();
   req.write(data);
   req.end();
 }
+
 
 function checkModel(apiKey, model, url, data, res) {
   if (apiKey === undefined) {
