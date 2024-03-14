@@ -79,3 +79,6 @@ Here's an example of how it could be configured:
 Start the server by running the command `node server.js`
 
 The server will automatically handle the routing and key rotation for you
+
+## Planned
+- [ ] choose the best latency proxy
