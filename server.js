@@ -16,7 +16,7 @@ function getNextApiKey() {
 function forwardToOpenAI(apiKeyInfo, url, data, res) {
   const { key, url: apiUrl } = apiKeyInfo;
   const openaiUrl = apiUrl + url;
-  
+
   const parsedUrl = new URL(openaiUrl);
 
   const transport = parsedUrl.protocol === 'https:' ? https : http;
@@ -45,13 +45,11 @@ function forwardToOpenAI(apiKeyInfo, url, data, res) {
     handleReverseProxyError(res, url, data);
   });
 
-  getNextApiKey();
   req.write(data);
   req.end();
 }
 
-
-function checkModel(apiKey, model, url, data, res) {
+async function checkModel(apiKey, model, url, data, res) {
   if (apiKey === undefined) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: 'No API key found' }));
@@ -114,8 +112,11 @@ http.createServer((req, res) => {
       const payload = JSON.parse(data);
       const model = payload.model;
 
-      const apiKeyInfo = apiKeys[currentApiKeyIndex];
+      // Choose endpoint with least latency (ping)
+      const sortedApiKeys = apiKeys.sort((a, b) => a.latency - b.latency);
+      const apiKeyInfo = sortedApiKeys[currentApiKeyIndex];
       const apiKey = apiKeyInfo.key;
+
       checkModel(apiKey, model, req.url, data, res);
     } catch (error) {
       console.error('Error processing request:', error);
@@ -124,5 +125,5 @@ http.createServer((req, res) => {
     }
   });
 }).listen(3456, 'localhost', () => {
-  console.log('Server running at http://localhost:3000/');
+  console.log('Server running at http://localhost:3456/');
 });
