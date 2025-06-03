@@ -58,7 +58,7 @@ Here's an example of how it could be configured:
       {
         "key": "sk-4dy7adya89dyh3sca68a78yauwsdhjf",
         "url": "https://api.openai.com",
-        "models": [gpt-3-5-turbo, gpt-3.5-turbo-0301, gpt-3.5-turbo-16k]
+        "models": [gpt-3.5-turbo, gpt-3.5-turbo-0301, gpt-3.5-turbo-16k]
       },
       {
         "key": "tr-dwadaw78xcawoidja0'w9dia9dwf",
