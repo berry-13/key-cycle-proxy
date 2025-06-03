@@ -170,6 +170,6 @@ http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
     }
   });
-}).listen(PORT, 'localhost', () => {
-  console.log(`Server running at http://localhost:${PORT}/`);
+}).listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running at http://0.0.0.0:${PORT}/`);
 });
