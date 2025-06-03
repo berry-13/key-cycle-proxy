@@ -77,9 +77,11 @@ Here's an example of how it could be configured:
 
 
 ## Usage
-Start the server by running the command `node server.js`
+Start the server by running the command `node server.js`.
 
-The server will automatically handle the routing and key rotation for you
+By default the proxy listens on port `3456` on all network interfaces, so it can
+be reached from other machines using `http://<server-ip>:3456`. The server will
+automatically handle the routing and key rotation for you.
 
 ## Planned
 - [x] choose the best latency proxy
