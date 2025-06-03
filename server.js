@@ -8,10 +8,56 @@ const PORT = 3456;
 let currentApiKeyIndex = 0;
 let attemptCount = 0;
 
+updateLatencies().catch((err) => console.error('Failed to update latencies', err));
+setInterval(updateLatencies, 60000);
+
+async function measureLatency(apiKeyInfo) {
+  return new Promise((resolve) => {
+    try {
+      const url = new URL(apiKeyInfo.url);
+      const transport = url.protocol === 'https:' ? https : http;
+      const start = Date.now();
+      const req = transport.request(url, { method: 'HEAD' }, (res) => {
+        res.on('end', () => resolve(Date.now() - start));
+        res.resume();
+      });
+      req.on('error', () => resolve(Number.MAX_SAFE_INTEGER));
+      req.setTimeout(5000, () => {
+        req.destroy();
+        resolve(Number.MAX_SAFE_INTEGER);
+      });
+      req.end();
+    } catch {
+      resolve(Number.MAX_SAFE_INTEGER);
+    }
+  });
+}
+
+async function updateLatencies() {
+  const latencies = await Promise.all(apiKeys.map((k) => measureLatency(k)));
+  latencies.forEach((latency, i) => {
+    apiKeys[i].latency = latency;
+  });
+  apiKeys.sort((a, b) => a.latency - b.latency);
+  currentApiKeyIndex = 0;
+  console.log('Updated proxy latencies:', apiKeys.map(k => `${k.url}:${k.latency}`).join(', '));
+}
+
 function getNextApiKey() {
   const numKeys = apiKeys.length;
   currentApiKeyIndex = (currentApiKeyIndex + 1) % numKeys;
   return apiKeys[currentApiKeyIndex];
+}
+
+function getBestApiKeyForModel(model) {
+  for (let i = 0; i < apiKeys.length; i++) {
+    const info = apiKeys[i];
+    if (info.models.includes(model) || info.models.includes('others')) {
+      currentApiKeyIndex = i;
+      return info;
+    }
+  }
+  return undefined;
 }
 
 function forwardToOpenAI(apiKeyInfo, url, data, res) {
@@ -64,7 +110,7 @@ function checkModel(apiKey, model, url, data, res) {
   if (!apiKeyInfo) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: 'Invalid API key' }));
-  } else if (apiKeyInfo.models.includes(model)) {
+  } else if (apiKeyInfo.models.includes(model) || apiKeyInfo.models.includes('others')) {
     attemptCount = 0;
     console.log(`Forwarding to ${apiKeyInfo.url} with API key: ${apiKey}`);
     forwardToOpenAI(apiKeyInfo, url, data, res);
@@ -115,8 +161,8 @@ http.createServer((req, res) => {
       const payload = JSON.parse(data);
       const model = payload.model;
 
-      const apiKeyInfo = apiKeys[currentApiKeyIndex];
-      const apiKey = apiKeyInfo.key;
+      const apiKeyInfo = getBestApiKeyForModel(model);
+      const apiKey = apiKeyInfo ? apiKeyInfo.key : undefined;
       checkModel(apiKey, model, req.url, data, res);
     } catch (error) {
       console.error('Error processing request:', error);

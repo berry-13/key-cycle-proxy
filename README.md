@@ -10,6 +10,7 @@ The KeyCycleProxy is a Node.js-based server that serves as a reverse proxy for r
 - Automatic rotation of API keys to prevent rate limiting
 - Efficient routing of requests to supported models
 - Custom API base URL (you can use it as a reverse proxy for reverse proxies)
+- Latency-based proxy selection for improved performance
 
 ## Prerequisites
 
@@ -81,4 +82,4 @@ Start the server by running the command `node server.js`
 The server will automatically handle the routing and key rotation for you
 
 ## Planned
-- [ ] choose the best latency proxy
+- [x] choose the best latency proxy
