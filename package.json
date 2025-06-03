@@ -4,10 +4,15 @@
     "description": "API-Key-Rotator",
     "main": "server.js",
     "scripts": {
-      "start": "node server.js"
+        "start": "node server.js",
+        "test": "mocha"
     },
     "dependencies": {
-      "http": "^0.0.1-security",
-      "https": "^1.0.0"
+        "http": "^0.0.1-security",
+        "https": "^1.0.0"
+    },
+    "devDependencies": {
+        "mocha": "^11.5.0",
+        "supertest": "^7.1.1"
     }
-  }
+}
