@@ -1,21 +1,20 @@
-  {
-    "apiKeys": [
-      {
-        "key": "api-key-1",
-        "url": "api-base-url-1",
-        "models": [model that this api key use]
-      },
-      {
-        "key": "api-key-2",
-        "url": "api-base-url-2",
-        "models": [ ]
-      },
-      {
-        "key": "another_api_key_here",
-        "url": "https://api.another.com",
-        "models": [ ]
-      }
-    ]
-  }
-  
-//"gpt-3.5-turbo", "gpt-4", "others"
+{
+  "_comment": "Example models: gpt-3.5-turbo, gpt-4, others",
+  "apiKeys": [
+    {
+      "key": "api-key-1",
+      "url": "api-base-url-1",
+      "models": ["model that this API key uses"]
+    },
+    {
+      "key": "api-key-2",
+      "url": "api-base-url-2",
+      "models": []
+    },
+    {
+      "key": "another_api_key_here",
+      "url": "https://api.another.com",
+      "models": []
+    }
+  ]
+}
