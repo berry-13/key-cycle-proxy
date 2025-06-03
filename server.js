@@ -3,6 +3,7 @@ const https = require('https');
 const config = require('./config.json');
 
 const apiKeys = config.apiKeys;
+const PORT = 3456;
 
 let currentApiKeyIndex = 0;
 let attemptCount = 0;
@@ -123,6 +124,6 @@ http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
     }
   });
-}).listen(3456, 'localhost', () => {
-  console.log('Server running at http://localhost:3000/');
+}).listen(PORT, 'localhost', () => {
+  console.log(`Server running at http://localhost:${PORT}/`);
 });
