@@ -1,12 +1,41 @@
 const http = require('http');
 const https = require('https');
-const config = require('./config.json');
+const fs = require('fs');
+const path = require('path');
+const express = require('express');
 
-const apiKeys = config.apiKeys;
+const configPath = path.join(__dirname, 'config.json');
+let config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+let apiKeys = config.apiKeys;
 const PORT = 3456;
 
 let currentApiKeyIndex = 0;
 let attemptCount = 0;
+
+const app = express();
+app.use(express.json());
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+});
+app.use('/', express.static(path.join(__dirname, 'public')));
+
+app.get('/api/config', (req, res) => {
+  res.json({ apiKeys });
+});
+
+app.post('/api/config', (req, res) => {
+  const body = req.body;
+  if (!body || !Array.isArray(body.apiKeys)) {
+    res.status(400).json({ error: 'Invalid config' });
+    return;
+  }
+  config = { apiKeys: body.apiKeys };
+  apiKeys = body.apiKeys;
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+  updateLatencies().catch(() => {});
+  res.json({ ok: true });
+});
 
 updateLatencies().catch((err) => console.error('Failed to update latencies', err));
 setInterval(updateLatencies, 60000);
@@ -140,16 +169,15 @@ async function modelNotSupported(apiKey, model, url, data, res) {
   checkModel(newApiKeyInfo.key, model, url, data, res);
 }
 
-http.createServer((req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  console.log('Received POST request:', req.url);
 
-  if (req.method !== 'POST') {
-    res.statusCode = 405; // Method Not Allowed
-    res.end();
+http.createServer((req, res) => {
+  if (req.method !== 'POST' || req.url.startsWith('/api')) {
+    app(req, res);
     return;
   }
+
+  res.setHeader('Content-Type', 'application/json');
+  console.log('Received POST request:', req.url);
 
   let data = '';
   req.on('data', (chunk) => {
