@@ -164,3 +164,11 @@ cython_debug/
 
 config.json
 test.js
+
+# Node.js dependencies
+node_modules/
+package-lock.json
+
+# Rust artifacts
+target/
+Cargo.lock
