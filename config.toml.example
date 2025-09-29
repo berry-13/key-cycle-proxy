@@ -1,0 +1,25 @@
+[server]
+bind_addr = "0.0.0.0:8080"
+request_body_limit_bytes = 262144
+graceful_shutdown_seconds = 10
+
+[upstream]
+base_url = "https://api.openai.com/v1"
+connect_timeout_ms = 800
+request_timeout_ms = 60000
+retry_initial_backoff_ms = 50
+retry_max_backoff_ms = 2000
+max_retries = 3
+
+[keys]
+rotation_strategy = "round_robin_health_weighted"
+unhealthy_penalty = 5
+
+[rate_limit]
+per_key_rps = 3
+global_rps = 50
+burst = 10
+
+[observability]
+metrics_bind = "0.0.0.0:9090"
+tracing_level = "info"

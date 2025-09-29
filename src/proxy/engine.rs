@@ -159,7 +159,7 @@ impl ProxyEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::UpstreamConfig;
+    use crate::config::{ApiKeyInfo, UpstreamConfig};
     use secrecy::SecretString;
 
     fn create_test_key(id: &str, models: Vec<&str>) -> ApiKeyInfo {
