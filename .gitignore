@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 #tests scripts folder
-tests/
+# tests/  # Commented out to allow Rust integration tests
 
 # C extensions
 *.so
