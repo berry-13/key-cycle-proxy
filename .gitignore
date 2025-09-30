@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 #tests scripts folder
-tests/
+# tests/  # Commented out to allow Rust integration tests
 
 # C extensions
 *.so
@@ -164,3 +164,11 @@ cython_debug/
 
 config.json
 test.js
+
+# Node.js dependencies
+node_modules/
+package-lock.json
+
+# Rust artifacts
+target/
+Cargo.lock
