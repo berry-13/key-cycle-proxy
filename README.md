@@ -3,6 +3,15 @@
     <h1 align="center">KeyCycleProxy</h1>
 </p>
 
+<p align="center">
+    <a href="https://github.com/berry-13/key-cycle-proxy/actions/workflows/test.yml">
+        <img src="https://github.com/berry-13/key-cycle-proxy/actions/workflows/test.yml/badge.svg" alt="Test Suite">
+    </a>
+    <a href="https://github.com/berry-13/key-cycle-proxy/actions/workflows/docker-image.yml">
+        <img src="https://github.com/berry-13/key-cycle-proxy/actions/workflows/docker-image.yml/badge.svg" alt="Docker Image">
+    </a>
+</p>
+
 **KeyCycleProxy** is a high-performance OpenAI API key rotation proxy written in Rust. It serves as a reverse proxy that automatically rotates between multiple API keys to ensure uninterrupted service and optimal performance.
 
 ## 🚀 Rust Rewrite

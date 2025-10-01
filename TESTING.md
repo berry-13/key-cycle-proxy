@@ -183,10 +183,50 @@ When all tests pass, the system demonstrates:
 
 ## Continuous Integration
 
-The test suite is designed for CI/CD integration:
-- Fast execution (typically <60 seconds total)
+The test suite is integrated with GitHub Actions for automated testing:
+
+### GitHub Actions Workflows
+
+**Test Suite** (`.github/workflows/test.yml`)
+- Runs on every push and pull request to main/develop branches
+- Tests on multiple Rust versions (stable and beta)
+- Includes all test suites:
+  - Unit tests (`cargo test --lib --bins`)
+  - API integration tests (`cargo test --test api_integration_tests`)
+  - Performance tests (`cargo test --test performance_tests`)
+  - Enhanced unit tests (`cargo test --test enhanced_unit_tests`)
+- Code quality checks:
+  - Code formatting (`cargo fmt --check`)
+  - Linting with Clippy (`cargo clippy`)
+- Build caching for faster execution
+- Code coverage reporting with cargo-tarpaulin
+- Typical execution time: <3 minutes
+
+**Docker Image** (`.github/workflows/docker-image.yml`)
+- Builds and publishes Docker images to GitHub Packages
+- Runs on pushes to main branch
+
+### Running Tests Locally
+
+```bash
+# Quick test run
+cargo test
+
+# Comprehensive test suite
+./run_tests.sh
+
+# Individual test suites
+cargo test --lib                          # Unit tests
+cargo test --test api_integration_tests   # API integration tests
+cargo test --test performance_tests       # Performance tests
+cargo test --test enhanced_unit_tests     # Enhanced unit tests
+```
+
+### CI/CD Features
+- Fast execution (typically <60 seconds for local, <3 minutes in CI)
 - Clear pass/fail indicators
 - Detailed performance metrics
 - Comprehensive coverage reporting
+- Automated on every commit
 
 This testing approach provides the "Playwright-like" API testing experience requested, ensuring the Rust implementation is production-ready and maintains full compatibility with existing clients.
