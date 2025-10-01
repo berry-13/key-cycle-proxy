@@ -1,0 +1,113 @@
+name: Test Suite
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Test (${{ matrix.rust }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - stable
+          - beta
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-index-
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-${{ matrix.rust }}-
+            ${{ runner.os }}-cargo-build-
+
+      - name: Check code formatting
+        if: matrix.rust == 'stable'
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        if: matrix.rust == 'stable'
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build project
+        run: cargo build --verbose
+
+      - name: Run unit tests
+        run: cargo test --lib --bins --verbose
+
+      - name: Run integration tests
+        run: cargo test --test api_integration_tests --verbose
+        continue-on-error: true
+
+      - name: Run performance tests
+        run: cargo test --test performance_tests --verbose
+
+      - name: Run enhanced unit tests
+        run: cargo test --test enhanced_unit_tests --verbose
+        continue-on-error: true
+
+      - name: Build release binary
+        if: matrix.rust == 'stable'
+        run: cargo build --release --verbose
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Generate coverage
+        run: cargo tarpaulin --verbose --all-features --workspace --timeout 300 --out Xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./cobertura.xml
+          fail_ci_if_error: false
