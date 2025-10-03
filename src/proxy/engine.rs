@@ -4,7 +4,10 @@ use crate::proxy::{
     upstream::{should_rotate_key, UpstreamClient},
 };
 use crate::types::OpenAIRequest;
-use crate::util::{convert_axum_headers_to_reqwest, convert_axum_method_to_reqwest, convert_reqwest_headers_to_axum};
+use crate::util::{
+    convert_axum_headers_to_reqwest, convert_axum_method_to_reqwest,
+    convert_reqwest_headers_to_axum,
+};
 use axum::body::Body;
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::Response;
@@ -21,11 +24,7 @@ pub struct ProxyEngine {
 }
 
 impl ProxyEngine {
-    pub fn new(
-        key_pool: Arc<KeyPool>,
-        upstream_client: UpstreamClient,
-        max_retries: u32,
-    ) -> Self {
+    pub fn new(key_pool: Arc<KeyPool>, upstream_client: UpstreamClient, max_retries: u32) -> Self {
         Self {
             key_pool,
             upstream_client,
@@ -96,14 +95,14 @@ impl ProxyEngine {
                             status
                         );
                         attempt_count += 1;
-                        
+
                         // Get next key for retry
                         if let Some(next_key) = self.key_pool.get_next_key() {
                             info!("Forwarding to {} with next API key", next_key.url);
                         }
-                        
+
                         last_error = Some(ProxyError::UpstreamFailed {
-                            source: reqwest::Error::from(response.error_for_status_ref().unwrap_err()),
+                            source: response.error_for_status_ref().unwrap_err(),
                         });
                         continue;
                     }
@@ -146,9 +145,8 @@ impl ProxyEngine {
 
         // Handle streaming response body
         let body_stream = response.bytes_stream();
-        let body = Body::from_stream(body_stream.map(|chunk| {
-            chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-        }));
+        let body =
+            Body::from_stream(body_stream.map(|chunk| chunk.map_err(std::io::Error::other)));
 
         builder
             .body(body)

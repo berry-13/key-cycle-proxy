@@ -3,7 +3,6 @@ use axum::{
     http::{Request, StatusCode},
     Router,
 };
-use bytes::Bytes;
 use key_cycle_proxy::{
     config::{ApiKeyInfo, UpstreamConfig},
     proxy::{KeyPool, ProxyEngine, ProxyHandler, UpstreamClient},
@@ -12,10 +11,9 @@ use key_cycle_proxy::{
 use secrecy::SecretString;
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
-use tokio::net::TcpListener;
 use tower::ServiceExt;
 use wiremock::{
-    matchers::{header, method, path, query_param},
+    matchers::{header, method, path},
     Mock, MockServer, ResponseTemplate,
 };
 
@@ -155,22 +153,20 @@ async fn test_api_key_rotation_on_rate_limit() {
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
         .and(header("authorization", "Bearer sk-test-key-2"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-fallback123",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "gpt-3.5-turbo",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Fallback response from second key"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-fallback123",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Fallback response from second key"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_2)
         .await;
 
@@ -215,22 +211,20 @@ async fn test_api_model_routing() {
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
         .and(header("authorization", "Bearer sk-test-key-2"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-claude123",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "claude-2",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Response from Claude model"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-claude123",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "claude-2",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Response from Claude model"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_2)
         .await;
 
@@ -386,7 +380,10 @@ async fn test_api_malformed_json() {
         .await
         .unwrap();
     let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(response_json["error"].as_str().unwrap().contains("Invalid JSON"));
+    assert!(response_json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Invalid JSON"));
 }
 
 #[tokio::test]
@@ -396,43 +393,39 @@ async fn test_api_concurrent_requests() {
     // Setup both servers to respond successfully
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-concurrent",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "gpt-3.5-turbo",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Concurrent response"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-concurrent",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Concurrent response"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_1)
         .await;
 
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-concurrent",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "claude-2",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Concurrent response"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-concurrent",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "claude-2",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Concurrent response"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_2)
         .await;
 
