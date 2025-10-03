@@ -155,8 +155,7 @@ impl ProxyEngine {
 
         // Handle streaming response body
         let body_stream = response.bytes_stream();
-        let body =
-            Body::from_stream(body_stream.map(|chunk| chunk.map_err(std::io::Error::other)));
+        let body = Body::from_stream(body_stream.map(|chunk| chunk.map_err(std::io::Error::other)));
 
         builder
             .body(body)

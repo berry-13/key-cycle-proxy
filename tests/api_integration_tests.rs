@@ -267,22 +267,20 @@ async fn test_api_error_handling_no_available_keys() {
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
         .and(header("authorization", "Bearer sk-test-key-2"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-others123",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "nonexistent-model",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Response from others fallback"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-others123",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "nonexistent-model",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Response from others fallback"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_2)
         .await;
 
