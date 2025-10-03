@@ -3,7 +3,6 @@ use axum::{
     http::{Request, StatusCode},
     Router,
 };
-use bytes::Bytes;
 use key_cycle_proxy::{
     config::{ApiKeyInfo, UpstreamConfig},
     proxy::{KeyPool, ProxyEngine, ProxyHandler, UpstreamClient},
@@ -12,10 +11,9 @@ use key_cycle_proxy::{
 use secrecy::SecretString;
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
-use tokio::net::TcpListener;
 use tower::ServiceExt;
 use wiremock::{
-    matchers::{header, method, path, query_param},
+    matchers::{header, method, path},
     Mock, MockServer, ResponseTemplate,
 };
 
@@ -155,22 +153,20 @@ async fn test_api_key_rotation_on_rate_limit() {
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
         .and(header("authorization", "Bearer sk-test-key-2"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-fallback123",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "gpt-3.5-turbo",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Fallback response from second key"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-fallback123",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Fallback response from second key"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_2)
         .await;
 
@@ -215,22 +211,20 @@ async fn test_api_model_routing() {
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
         .and(header("authorization", "Bearer sk-test-key-2"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-claude123",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "claude-2",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Response from Claude model"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-claude123",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "claude-2",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Response from Claude model"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_2)
         .await;
 
@@ -267,9 +261,30 @@ async fn test_api_model_routing() {
 
 #[tokio::test]
 async fn test_api_error_handling_no_available_keys() {
-    let (app, _mock_server_1, _mock_server_2) = create_test_app_with_mocks().await;
+    let (app, _mock_server_1, mock_server_2) = create_test_app_with_mocks().await;
 
-    // Test with a model that has no matching keys (no setup for a specific model)
+    // Setup mock response for the "others" key (key 2) to handle any model
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .and(header("authorization", "Bearer sk-test-key-2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-others123",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "nonexistent-model",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Response from others fallback"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
+        .mount(&mock_server_2)
+        .await;
+
+    // Test with a model that has no matching keys (but "others" should catch it)
     let request = Request::builder()
         .method("POST")
         .uri("/v1/chat/completions")
@@ -278,7 +293,7 @@ async fn test_api_error_handling_no_available_keys() {
             json!({
                 "model": "nonexistent-model",
                 "messages": [
-                    {"role": "user", "content": "This should fail"}
+                    {"role": "user", "content": "This should be handled by others fallback"}
                 ]
             })
             .to_string(),
@@ -287,10 +302,8 @@ async fn test_api_error_handling_no_available_keys() {
 
     let response = app.oneshot(request).await.unwrap();
 
-    // Should return error when no keys match and no "others" fallback
-    // Note: In our setup, we have an "others" key, so this will actually work
-    // Let's create a scenario where truly no keys are available
-    assert!(response.status().is_success() || response.status().is_server_error());
+    // Should succeed because we have an "others" key that matches all models
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]
@@ -303,9 +316,9 @@ async fn test_api_streaming_response() {
         .and(header("authorization", "Bearer sk-test-key-1"))
         .respond_with(
             ResponseTemplate::new(200)
-                .set_body_string("data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" world!\"}}]}\n\ndata: [DONE]\n\n")
-                .insert_header("content-type", "text/event-stream")
-                .insert_header("cache-control", "no-cache"),
+                .set_body_bytes("data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" world!\"}}]}\n\ndata: [DONE]\n\n")
+                .append_header("content-type", "text/event-stream")
+                .append_header("cache-control", "no-cache"),
         )
         .mount(&mock_server_1)
         .await;
@@ -386,7 +399,10 @@ async fn test_api_malformed_json() {
         .await
         .unwrap();
     let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(response_json["error"].as_str().unwrap().contains("Invalid JSON"));
+    assert!(response_json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Invalid JSON"));
 }
 
 #[tokio::test]
@@ -396,43 +412,39 @@ async fn test_api_concurrent_requests() {
     // Setup both servers to respond successfully
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-concurrent",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "gpt-3.5-turbo",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Concurrent response"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-concurrent",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Concurrent response"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_1)
         .await;
 
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(json!({
-                "id": "chatcmpl-concurrent",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": "claude-2",
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Concurrent response"
-                    },
-                    "finish_reason": "stop"
-                }]
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "chatcmpl-concurrent",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "claude-2",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Concurrent response"
+                },
+                "finish_reason": "stop"
+            }]
+        })))
         .mount(&mock_server_2)
         .await;
 

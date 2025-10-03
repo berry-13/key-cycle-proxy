@@ -8,27 +8,24 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
+use std::time::Duration;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
-use std::time::Duration;
 
 pub fn create_router(
-    handler: Arc<ProxyHandler>, 
+    handler: Arc<ProxyHandler>,
     body_limit: usize,
     request_timeout: Duration,
 ) -> Router {
     Router::new()
         // Health check endpoint
         .route("/health", get(ProxyHandler::health_check))
-        
         // Catch-all for OpenAI API requests (maintaining compatibility with existing paths)
         .route("/*path", any(proxy_request_handler))
-        
         // Add the handler as application state
         .with_state(handler)
-        
         // Add middleware layers
         .layer(
             CorsLayer::new()
@@ -73,8 +70,8 @@ mod tests {
     use super::*;
     use crate::config::{ApiKeyInfo, UpstreamConfig};
     use crate::proxy::{KeyPool, ProxyEngine, UpstreamClient};
-    use axum::http::{Request, StatusCode};
     use axum::body::Body;
+    use axum::http::{Request, StatusCode};
     use secrecy::SecretString;
     use tower::ServiceExt;
 

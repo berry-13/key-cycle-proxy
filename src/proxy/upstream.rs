@@ -34,7 +34,7 @@ impl UpstreamClient {
         headers: Option<reqwest::header::HeaderMap>,
     ) -> ProxyResult<Response> {
         let url = format!("{}{}", key_info.url, path);
-        
+
         debug!(
             "Making {} request to {} with API key (redacted)",
             method, url
@@ -65,7 +65,9 @@ impl UpstreamClient {
             match timeout(self.config.request_timeout(), request.send()).await {
                 Ok(Ok(response)) => {
                     // Check for retryable HTTP status codes
-                    if self.should_retry_status(response.status()) && attempt < self.config.max_retries {
+                    if self.should_retry_status(response.status())
+                        && attempt < self.config.max_retries
+                    {
                         warn!(
                             "Received retryable status {} from upstream {}, attempt {}/{}",
                             response.status(),
@@ -73,21 +75,30 @@ impl UpstreamClient {
                             attempt + 1,
                             self.config.max_retries + 1
                         );
-                        
+
                         // Wait before retry
-                        let wait_time = Duration::from_millis(self.config.retry_initial_backoff_ms * (2_u64.pow(attempt)));
+                        let wait_time = Duration::from_millis(
+                            self.config.retry_initial_backoff_ms * (2_u64.pow(attempt)),
+                        );
                         tokio::time::sleep(wait_time.min(self.config.retry_max_backoff())).await;
                         continue;
                     }
-                    
+
                     return Ok(response);
                 }
                 Ok(Err(e)) => {
                     if self.should_retry_error(&e) && attempt < self.config.max_retries {
-                        warn!("Request error: {}, retrying attempt {}/{}", e, attempt + 1, self.config.max_retries + 1);
-                        
+                        warn!(
+                            "Request error: {}, retrying attempt {}/{}",
+                            e,
+                            attempt + 1,
+                            self.config.max_retries + 1
+                        );
+
                         // Wait before retry
-                        let wait_time = Duration::from_millis(self.config.retry_initial_backoff_ms * (2_u64.pow(attempt)));
+                        let wait_time = Duration::from_millis(
+                            self.config.retry_initial_backoff_ms * (2_u64.pow(attempt)),
+                        );
                         tokio::time::sleep(wait_time.min(self.config.retry_max_backoff())).await;
                         continue;
                     } else {
@@ -96,10 +107,16 @@ impl UpstreamClient {
                 }
                 Err(_) => {
                     if attempt < self.config.max_retries {
-                        warn!("Request timeout, retrying attempt {}/{}", attempt + 1, self.config.max_retries + 1);
-                        
+                        warn!(
+                            "Request timeout, retrying attempt {}/{}",
+                            attempt + 1,
+                            self.config.max_retries + 1
+                        );
+
                         // Wait before retry
-                        let wait_time = Duration::from_millis(self.config.retry_initial_backoff_ms * (2_u64.pow(attempt)));
+                        let wait_time = Duration::from_millis(
+                            self.config.retry_initial_backoff_ms * (2_u64.pow(attempt)),
+                        );
                         tokio::time::sleep(wait_time.min(self.config.retry_max_backoff())).await;
                         continue;
                     } else {
@@ -137,7 +154,7 @@ impl UpstreamClient {
             418 | // I'm a teapot (some APIs use this for rate limiting)
             502 | // Bad Gateway
             503 | // Service Unavailable
-            504   // Gateway Timeout
+            504 // Gateway Timeout
         )
     }
 }
@@ -149,7 +166,7 @@ pub fn should_rotate_key(status: reqwest::StatusCode) -> bool {
         429 | // Too Many Requests
         418 | // I'm a teapot
         502 | // Bad Gateway
-        400   // Bad Request (potentially invalid key)
+        400 // Bad Request (potentially invalid key)
     )
 }
 
@@ -157,7 +174,6 @@ pub fn should_rotate_key(status: reqwest::StatusCode) -> bool {
 mod tests {
     use super::*;
     use reqwest::StatusCode;
-    use secrecy::SecretString;
 
     fn create_test_config() -> UpstreamConfig {
         UpstreamConfig {
@@ -168,16 +184,6 @@ mod tests {
             retry_max_backoff_ms: 1000,
             max_retries: 3,
         }
-    }
-
-    fn create_test_key() -> Arc<ApiKeyInfo> {
-        Arc::new(ApiKeyInfo {
-            key: SecretString::new("test-key".to_string()),
-            url: "https://api.test.com".to_string(),
-            models: vec!["gpt-3.5-turbo".to_string()],
-            latency: None,
-            health_score: 1.0,
-        })
     }
 
     #[test]

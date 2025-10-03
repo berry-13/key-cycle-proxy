@@ -5,6 +5,7 @@ pub mod key_pool;
 pub mod upstream;
 
 pub use engine::ProxyEngine;
+#[allow(unused_imports)]
 pub use error::ProxyError;
 pub use handler::ProxyHandler;
 pub use key_pool::KeyPool;

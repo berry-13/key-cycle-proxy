@@ -78,11 +78,13 @@ impl KeyPool {
 
     /// Update latency measurement for a key
     pub fn update_latency(&self, key_index: usize, latency: Duration) {
-        self.latency_cache.insert(key_index, (latency, Instant::now()));
+        self.latency_cache
+            .insert(key_index, (latency, Instant::now()));
         debug!("Updated latency for key {}: {:?}", key_index, latency);
     }
 
     /// Get all keys for health checking
+    #[allow(dead_code)]
     pub fn get_all_keys(&self) -> &[Arc<ApiKeyInfo>] {
         &self.keys
     }
@@ -90,19 +92,19 @@ impl KeyPool {
     /// Measure latency for all keys by making HEAD requests
     pub async fn update_all_latencies(&self) {
         info!("Starting latency measurements for {} keys", self.keys.len());
-        
+
         let client = reqwest::Client::new();
         let mut tasks = vec![];
 
         for (index, key_info) in self.keys.iter().enumerate() {
             let client = client.clone();
             let url = key_info.url.clone();
-            
+
             let task = tokio::spawn(async move {
                 let latency = measure_key_latency(&client, &url).await;
                 (index, latency)
             });
-            
+
             tasks.push(task);
         }
 
@@ -125,13 +127,16 @@ impl KeyPool {
         if keys.is_empty() {
             return None;
         }
-        
+
         let current = self.current_index.fetch_add(1, Ordering::SeqCst);
         let index = current % keys.len();
         Some(keys[index].1.clone())
     }
 
-    fn health_weighted_selection(&self, keys: &[(usize, &Arc<ApiKeyInfo>)]) -> Option<Arc<ApiKeyInfo>> {
+    fn health_weighted_selection(
+        &self,
+        keys: &[(usize, &Arc<ApiKeyInfo>)],
+    ) -> Option<Arc<ApiKeyInfo>> {
         if keys.is_empty() {
             return None;
         }
@@ -141,7 +146,10 @@ impl KeyPool {
         self.round_robin_selection(keys)
     }
 
-    fn least_latency_selection(&self, keys: &[(usize, &Arc<ApiKeyInfo>)]) -> Option<Arc<ApiKeyInfo>> {
+    fn least_latency_selection(
+        &self,
+        keys: &[(usize, &Arc<ApiKeyInfo>)],
+    ) -> Option<Arc<ApiKeyInfo>> {
         if keys.is_empty() {
             return None;
         }
@@ -179,11 +187,11 @@ impl KeyPool {
 
 async fn measure_key_latency(client: &reqwest::Client, url: &str) -> Duration {
     let start = Instant::now();
-    
+
     // Make a HEAD request with timeout
     let request_timeout = Duration::from_secs(5);
     let result = timeout(request_timeout, client.head(url).send()).await;
-    
+
     match result {
         Ok(Ok(_)) => {
             let duration = start.elapsed();
@@ -229,7 +237,7 @@ mod tests {
         // Test round-robin for gpt-3.5-turbo (should cycle between keys 1 and 2)
         let key1 = pool.get_key_for_model("gpt-3.5-turbo").unwrap();
         let key2 = pool.get_key_for_model("gpt-3.5-turbo").unwrap();
-        
+
         // Keys should be different (round-robin)
         assert_ne!(key1.url, key2.url);
     }

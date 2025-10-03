@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 pub fn convert_axum_method_to_reqwest(method: &axum::http::Method) -> reqwest::Method {
     match *method {
         axum::http::Method::GET => reqwest::Method::GET,
@@ -18,7 +16,7 @@ pub fn convert_axum_headers_to_reqwest(
     headers: &axum::http::HeaderMap,
 ) -> reqwest::header::HeaderMap {
     let mut reqwest_headers = reqwest::header::HeaderMap::new();
-    
+
     for (name, value) in headers {
         if let (Ok(req_name), Ok(req_value)) = (
             reqwest::header::HeaderName::from_bytes(name.as_str().as_bytes()),
@@ -27,7 +25,7 @@ pub fn convert_axum_headers_to_reqwest(
             reqwest_headers.insert(req_name, req_value);
         }
     }
-    
+
     reqwest_headers
 }
 
@@ -35,7 +33,7 @@ pub fn convert_reqwest_headers_to_axum(
     headers: &reqwest::header::HeaderMap,
 ) -> axum::http::HeaderMap {
     let mut axum_headers = axum::http::HeaderMap::new();
-    
+
     for (name, value) in headers {
         if let (Ok(axum_name), Ok(axum_value)) = (
             axum::http::HeaderName::from_bytes(name.as_str().as_bytes()),
@@ -44,6 +42,6 @@ pub fn convert_reqwest_headers_to_axum(
             axum_headers.insert(axum_name, axum_value);
         }
     }
-    
+
     axum_headers
 }

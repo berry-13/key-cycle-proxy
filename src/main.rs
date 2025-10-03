@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
 
     // Load configuration
     let (config, api_keys) = load_config().context("Failed to load configuration")?;
-    
+
     if api_keys.is_empty() {
         anyhow::bail!("No API keys configured. Please set OPENAI_KEYS environment variable or create config.json");
     }
@@ -52,8 +52,8 @@ async fn main() -> Result<()> {
 
     // Initialize components
     let key_pool = Arc::new(KeyPool::new(api_keys, &config.keys.rotation_strategy));
-    let upstream_client = UpstreamClient::new(config.upstream.clone())
-        .context("Failed to create upstream client")?;
+    let upstream_client =
+        UpstreamClient::new(config.upstream.clone()).context("Failed to create upstream client")?;
     let engine = Arc::new(ProxyEngine::new(
         key_pool.clone(),
         upstream_client,
@@ -145,7 +145,10 @@ async fn shutdown_signal(grace_period: Duration) {
 
     // Give the server some time to finish ongoing requests
     if grace_period > Duration::ZERO {
-        info!("Waiting {}s for ongoing requests to complete...", grace_period.as_secs());
+        info!(
+            "Waiting {}s for ongoing requests to complete...",
+            grace_period.as_secs()
+        );
         tokio::time::sleep(grace_period).await;
     }
 }
