@@ -54,15 +54,28 @@ impl ProxyEngine {
         // Attempt the request with retries
         let mut attempt_count = 0;
         let mut last_error = None;
+        let mut use_next_key = false;
 
         while attempt_count <= self.max_retries {
             // Get appropriate API key for the model
-            let key_info = match self.key_pool.get_key_for_model(&model) {
-                Some(key) => key,
-                None => {
-                    return Err(ProxyError::NoKeyAvailable {
-                        model: model.clone(),
-                    })
+            // On first attempt, use model-specific key; on retries, rotate through all keys
+            let key_info = if use_next_key {
+                match self.key_pool.get_next_key() {
+                    Some(key) => key,
+                    None => {
+                        return Err(ProxyError::NoKeyAvailable {
+                            model: model.clone(),
+                        })
+                    }
+                }
+            } else {
+                match self.key_pool.get_key_for_model(&model) {
+                    Some(key) => key,
+                    None => {
+                        return Err(ProxyError::NoKeyAvailable {
+                            model: model.clone(),
+                        })
+                    }
                 }
             };
 
@@ -95,11 +108,7 @@ impl ProxyEngine {
                             status
                         );
                         attempt_count += 1;
-
-                        // Get next key for retry
-                        if let Some(next_key) = self.key_pool.get_next_key() {
-                            info!("Forwarding to {} with next API key", next_key.url);
-                        }
+                        use_next_key = true; // Switch to using get_next_key for retries
 
                         last_error = Some(ProxyError::UpstreamFailed {
                             source: response.error_for_status_ref().unwrap_err(),
@@ -114,6 +123,7 @@ impl ProxyEngine {
                     error!("Error sending request to upstream: {}", e);
                     last_error = Some(e);
                     attempt_count += 1;
+                    use_next_key = true; // Switch to using get_next_key for retries
                 }
             }
         }
