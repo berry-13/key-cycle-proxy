@@ -1,14 +1,19 @@
-use serde::{Deserialize, Serialize};
-use secrecy::SecretString;
-use std::time::Duration;
 use anyhow::{Context, Result};
+use secrecy::SecretString;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Config {
+    #[serde(default)]
     pub server: ServerConfig,
+    #[serde(default)]
     pub upstream: UpstreamConfig,
+    #[serde(default)]
     pub keys: KeysConfig,
+    #[serde(default)]
     pub rate_limit: RateLimitConfig,
+    #[serde(default)]
     pub observability: ObservabilityConfig,
 }
 
@@ -65,6 +70,7 @@ pub struct ObservabilityConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct ApiKeyInfo {
     #[serde(skip_serializing)]
     pub key: SecretString,
@@ -93,18 +99,6 @@ pub struct LegacyApiKeyInfo {
     pub key: String,
     pub url: String,
     pub models: Vec<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            upstream: UpstreamConfig::default(),
-            keys: KeysConfig::default(),
-            rate_limit: RateLimitConfig::default(),
-            observability: ObservabilityConfig::default(),
-        }
-    }
 }
 
 impl Default for ServerConfig {
@@ -159,36 +153,67 @@ impl Default for ObservabilityConfig {
 }
 
 // Default value functions
-fn default_bind_addr() -> String { "0.0.0.0:8080".to_string() }
-fn default_request_body_limit() -> usize { 262_144 }
-fn default_graceful_shutdown_seconds() -> u64 { 10 }
-fn default_base_url() -> String { "https://api.openai.com/v1".to_string() }
-fn default_connect_timeout() -> u64 { 800 }
-fn default_request_timeout() -> u64 { 60_000 }
-fn default_retry_initial_backoff() -> u64 { 50 }
-fn default_retry_max_backoff() -> u64 { 2000 }
-fn default_max_retries() -> u32 { 3 }
-fn default_rotation_strategy() -> String { "round_robin_health_weighted".to_string() }
-fn default_unhealthy_penalty() -> u32 { 5 }
-fn default_per_key_rps() -> u32 { 3 }
-fn default_global_rps() -> u32 { 50 }
-fn default_burst() -> u32 { 10 }
-fn default_metrics_bind() -> String { "0.0.0.0:9090".to_string() }
-fn default_tracing_level() -> String { "info".to_string() }
+fn default_bind_addr() -> String {
+    "0.0.0.0:8080".to_string()
+}
+fn default_request_body_limit() -> usize {
+    262_144
+}
+fn default_graceful_shutdown_seconds() -> u64 {
+    10
+}
+fn default_base_url() -> String {
+    "https://api.openai.com/v1".to_string()
+}
+fn default_connect_timeout() -> u64 {
+    800
+}
+fn default_request_timeout() -> u64 {
+    60_000
+}
+fn default_retry_initial_backoff() -> u64 {
+    50
+}
+fn default_retry_max_backoff() -> u64 {
+    2000
+}
+fn default_max_retries() -> u32 {
+    3
+}
+fn default_rotation_strategy() -> String {
+    "round_robin_health_weighted".to_string()
+}
+fn default_unhealthy_penalty() -> u32 {
+    5
+}
+fn default_per_key_rps() -> u32 {
+    3
+}
+fn default_global_rps() -> u32 {
+    50
+}
+fn default_burst() -> u32 {
+    10
+}
+fn default_metrics_bind() -> String {
+    "0.0.0.0:9090".to_string()
+}
+fn default_tracing_level() -> String {
+    "info".to_string()
+}
 
 pub fn load_config() -> Result<(Config, Vec<ApiKeyInfo>)> {
     // Load main config
     let mut config = Config::default();
-    
+
     // Try to load from config file if it exists
     if let Ok(config_str) = std::fs::read_to_string("config.toml") {
-        config = toml::from_str(&config_str)
-            .context("Failed to parse config.toml")?;
+        config = toml::from_str(&config_str).context("Failed to parse config.toml")?;
     }
-    
+
     // Load API keys from environment or legacy config.json
     let api_keys = load_api_keys()?;
-    
+
     Ok((config, api_keys))
 }
 
@@ -196,29 +221,36 @@ fn load_api_keys() -> Result<Vec<ApiKeyInfo>> {
     // First try environment variable
     if let Ok(keys_env) = std::env::var("OPENAI_KEYS") {
         let keys: Vec<&str> = keys_env.split(',').collect();
-        return Ok(keys.into_iter().map(|key| ApiKeyInfo {
-            key: SecretString::new(key.trim().to_string()),
-            url: default_base_url(),
-            models: vec!["others".to_string()],
-            latency: None,
-            health_score: 1.0,
-        }).collect());
+        return Ok(keys
+            .into_iter()
+            .map(|key| ApiKeyInfo {
+                key: SecretString::new(key.trim().to_string()),
+                url: default_base_url(),
+                models: vec!["others".to_string()],
+                latency: None,
+                health_score: 1.0,
+            })
+            .collect());
     }
-    
+
     // Fallback to legacy config.json
     if let Ok(config_content) = std::fs::read_to_string("config.json") {
-        let legacy_config: LegacyConfig = serde_json::from_str(&config_content)
-            .context("Failed to parse config.json")?;
-        
-        return Ok(legacy_config.api_keys.into_iter().map(|key_info| ApiKeyInfo {
-            key: SecretString::new(key_info.key),
-            url: key_info.url,
-            models: key_info.models,
-            latency: None,
-            health_score: 1.0,
-        }).collect());
+        let legacy_config: LegacyConfig =
+            serde_json::from_str(&config_content).context("Failed to parse config.json")?;
+
+        return Ok(legacy_config
+            .api_keys
+            .into_iter()
+            .map(|key_info| ApiKeyInfo {
+                key: SecretString::new(key_info.key),
+                url: key_info.url,
+                models: key_info.models,
+                latency: None,
+                health_score: 1.0,
+            })
+            .collect());
     }
-    
+
     anyhow::bail!("No API keys found. Set OPENAI_KEYS environment variable or create config.json");
 }
 
@@ -226,15 +258,16 @@ impl UpstreamConfig {
     pub fn connect_timeout(&self) -> Duration {
         Duration::from_millis(self.connect_timeout_ms)
     }
-    
+
     pub fn request_timeout(&self) -> Duration {
         Duration::from_millis(self.request_timeout_ms)
     }
-    
+
+    #[allow(dead_code)]
     pub fn retry_initial_backoff(&self) -> Duration {
         Duration::from_millis(self.retry_initial_backoff_ms)
     }
-    
+
     pub fn retry_max_backoff(&self) -> Duration {
         Duration::from_millis(self.retry_max_backoff_ms)
     }

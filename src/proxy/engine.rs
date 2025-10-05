@@ -4,7 +4,10 @@ use crate::proxy::{
     upstream::{should_rotate_key, UpstreamClient},
 };
 use crate::types::OpenAIRequest;
-use crate::util::{convert_axum_headers_to_reqwest, convert_axum_method_to_reqwest, convert_reqwest_headers_to_axum};
+use crate::util::{
+    convert_axum_headers_to_reqwest, convert_axum_method_to_reqwest,
+    convert_reqwest_headers_to_axum,
+};
 use axum::body::Body;
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::Response;
@@ -21,11 +24,7 @@ pub struct ProxyEngine {
 }
 
 impl ProxyEngine {
-    pub fn new(
-        key_pool: Arc<KeyPool>,
-        upstream_client: UpstreamClient,
-        max_retries: u32,
-    ) -> Self {
+    pub fn new(key_pool: Arc<KeyPool>, upstream_client: UpstreamClient, max_retries: u32) -> Self {
         Self {
             key_pool,
             upstream_client,
@@ -55,15 +54,28 @@ impl ProxyEngine {
         // Attempt the request with retries
         let mut attempt_count = 0;
         let mut last_error = None;
+        let mut use_next_key = false;
 
         while attempt_count <= self.max_retries {
             // Get appropriate API key for the model
-            let key_info = match self.key_pool.get_key_for_model(&model) {
-                Some(key) => key,
-                None => {
-                    return Err(ProxyError::NoKeyAvailable {
-                        model: model.clone(),
-                    })
+            // On first attempt, use model-specific key; on retries, rotate through all keys
+            let key_info = if use_next_key {
+                match self.key_pool.get_next_key() {
+                    Some(key) => key,
+                    None => {
+                        return Err(ProxyError::NoKeyAvailable {
+                            model: model.clone(),
+                        })
+                    }
+                }
+            } else {
+                match self.key_pool.get_key_for_model(&model) {
+                    Some(key) => key,
+                    None => {
+                        return Err(ProxyError::NoKeyAvailable {
+                            model: model.clone(),
+                        })
+                    }
                 }
             };
 
@@ -96,14 +108,10 @@ impl ProxyEngine {
                             status
                         );
                         attempt_count += 1;
-                        
-                        // Get next key for retry
-                        if let Some(next_key) = self.key_pool.get_next_key() {
-                            info!("Forwarding to {} with next API key", next_key.url);
-                        }
-                        
+                        use_next_key = true; // Switch to using get_next_key for retries
+
                         last_error = Some(ProxyError::UpstreamFailed {
-                            source: reqwest::Error::from(response.error_for_status_ref().unwrap_err()),
+                            source: response.error_for_status_ref().unwrap_err(),
                         });
                         continue;
                     }
@@ -115,6 +123,7 @@ impl ProxyEngine {
                     error!("Error sending request to upstream: {}", e);
                     last_error = Some(e);
                     attempt_count += 1;
+                    use_next_key = true; // Switch to using get_next_key for retries
                 }
             }
         }
@@ -146,9 +155,7 @@ impl ProxyEngine {
 
         // Handle streaming response body
         let body_stream = response.bytes_stream();
-        let body = Body::from_stream(body_stream.map(|chunk| {
-            chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-        }));
+        let body = Body::from_stream(body_stream.map(|chunk| chunk.map_err(std::io::Error::other)));
 
         builder
             .body(body)

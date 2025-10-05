@@ -46,6 +46,7 @@ impl ProxyHandler {
     }
 
     /// Handle requests with path parameters (for /v1/* routes)
+    #[allow(dead_code)]
     pub async fn handle_v1_request(
         State(handler): State<Arc<ProxyHandler>>,
         Path(path): Path<String>,
@@ -76,6 +77,7 @@ impl ProxyHandler {
 }
 
 /// Extract the request body as bytes
+#[allow(dead_code)]
 pub async fn extract_body(request: Request) -> Result<Bytes, StatusCode> {
     match axum::body::to_bytes(request.into_body(), usize::MAX).await {
         Ok(bytes) => Ok(bytes),
@@ -89,27 +91,6 @@ pub async fn extract_body(request: Request) -> Result<Bytes, StatusCode> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{ApiKeyInfo, UpstreamConfig};
-    use crate::proxy::{KeyPool, UpstreamClient};
-    use axum::http::Method;
-    use secrecy::SecretString;
-
-    fn create_test_handler() -> ProxyHandler {
-        let key = ApiKeyInfo {
-            key: SecretString::new("test-key".to_string()),
-            url: "https://api.test.com".to_string(),
-            models: vec!["gpt-3.5-turbo".to_string()],
-            latency: None,
-            health_score: 1.0,
-        };
-
-        let key_pool = Arc::new(KeyPool::new(vec![key], "round_robin"));
-        let upstream_config = UpstreamConfig::default();
-        let upstream_client = UpstreamClient::new(upstream_config).unwrap();
-        let engine = Arc::new(ProxyEngine::new(key_pool, upstream_client, 3));
-
-        ProxyHandler::new(engine)
-    }
 
     #[tokio::test]
     async fn test_health_check() {

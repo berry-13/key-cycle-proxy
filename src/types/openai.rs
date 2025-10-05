@@ -10,11 +10,13 @@ pub struct OpenAIRequest {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[allow(dead_code)]
 pub struct OpenAIError {
     pub error: OpenAIErrorDetails,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[allow(dead_code)]
 pub struct OpenAIErrorDetails {
     pub message: String,
     #[serde(rename = "type")]
