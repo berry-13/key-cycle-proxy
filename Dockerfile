@@ -1,10 +1,18 @@
 # Multi-stage build for Rust application
-FROM rust:1.70 as builder
+FROM rust:1.82 as builder
+
+# Update CA certificates for HTTPS
+RUN apt-get update && \
+    apt-get install -y ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy dependency files first for better caching
 COPY Cargo.toml Cargo.lock ./
+
+# Copy benches directory for Cargo.toml manifest validation
+COPY benches ./benches
 
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
