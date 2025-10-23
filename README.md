@@ -240,7 +240,7 @@ cargo build --release --locked
 ### Docker Production
 
 ```dockerfile
-FROM rust:1.70 as builder
+FROM rust:1.82 as builder
 WORKDIR /app
 COPY . .
 RUN cargo build --release

@@ -31,6 +31,23 @@ jobs:
         run: |
           docker build -f Dockerfile -t key-cycle-proxy .
 
+      - name: Test Docker image
+        run: |
+          # Start container in background
+          docker run -d --name test-container -p 8080:8080 -e OPENAI_KEYS="sk-test-key" key-cycle-proxy
+          # Wait for container to start
+          sleep 5
+          # Check if container is still running
+          if ! docker ps | grep test-container; then
+            echo "Container failed to start"
+            docker logs test-container
+            exit 1
+          fi
+          echo "Docker image smoke test passed"
+          # Stop and remove container
+          docker stop test-container
+          docker rm test-container
+
       - name: Tag and push bot image
         run: |
           docker tag key-cycle-proxy:latest ghcr.io/berry-13/key-cycle-proxy:${{ github.sha }}
